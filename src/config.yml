@@ -1,12 +1,12 @@
-enable: true
-ignore_animals: true
-detect:
-  radius: 15
-  height: 5
-  limit: 10
-  depth_limit: 50
-  hard_limit: 500
-  block_types:
+enable: true          # Global enable toggle for the plugin
+ignore_animals: true  # If true, the plugin does not prevent animals from spawning
+detect:       # Detection-specitic settings
+  radius: 15        # Size of the detection square measured around the spawning block
+  height: 5         # Vertical size of the detection box, both above and below the spawn
+  limit: 10         # Number of blocks matched after which the spawning is disallowed
+  depth_limit: 50   # Allows all spawns to happen below this height
+  hard_limit: 500   # Hard limit of detected blocks after which the spawn is disallowed
+  block_types:      # List of blocks that will be used to detect man-made structures
   - WOOD
   - COBBLESTONE
   - DIAMOND_BLOCK
@@ -37,16 +37,16 @@ detect:
   - IRON_FENCE
   - NETHER_BRICK
   - NETHER_FENCE
-structures:
+structures: # Structure detection settings
   detect: true
   radius: 5
   height: 2
   limit: 3
-treetops:
+treetops:   # Treetop spawn prevention
   allow: false
   minimum_leaves: 4
-spawners:
+spawners:   # Spawns near a spawner
   allow: true
-cobwebs:
+cobwebs:    # Spawns near a cobweb
   allow: true
-  limit: 1
+  limit: 1  # Number of cobweb blocks required to allow the spawn
