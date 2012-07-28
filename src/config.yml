@@ -1,0 +1,52 @@
+enable: true
+ignore_animals: true
+detect:
+  radius: 15
+  height: 5
+  limit: 10
+  depth_limit: 50
+  hard_limit: 500
+  block_types:
+  - WOOD
+  - COBBLESTONE
+  - DIAMOND_BLOCK
+  - BRICK
+  - FENCE
+  - GOLD_BLOCK
+  - IRON_BLOCK
+  - LAPIS_BLOCK
+  - SNOW_BLOCK
+  - COBBLESTONE_STAIRS
+  - WOOD_STAIRS
+  - WOODEN_DOOR
+  - IRON_DOOR
+  - STEP
+  - DOUBLE_STEP
+  - WOOL
+  - BED_BLOCK
+  - CHEST
+  - FENCE_GATE
+  - MOSSY_COBBLESTONE
+  - SMOOTH_BRICK
+  - SMOOTH_STAIRS
+  - THIN_GLASS
+  - TRAP_DOOR
+  - OBSIDIAN
+  - BEDROCK
+  - IRON_DOOR_BLOCK
+  - IRON_FENCE
+  - NETHER_BRICK
+  - NETHER_FENCE
+structures:
+  detect: true
+  radius: 5
+  height: 2
+  limit: 3
+treetops:
+  allow: false
+  minimum_leaves: 4
+spawners:
+  allow: true
+cobwebs:
+  allow: true
+  limit: 1
