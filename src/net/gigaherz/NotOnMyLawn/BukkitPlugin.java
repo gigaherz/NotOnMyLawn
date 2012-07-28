@@ -88,41 +88,41 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
 
         Location loc = event.getLocation();
 
-        int wx = loc.getBlockX();
         int wy = loc.getBlockY();
-        int wz = loc.getBlockZ();
-
         if (wy < detectDepthLimit) {
             return;
         }
 
+        int wx = loc.getBlockX();
+        int wz = loc.getBlockZ();
+
         World world = event.getEntity().getWorld();
 
-        // fast-exit options
-        if (allowNearCobwebs || allowMobSpawners || preventTreetopSpawn) {
-            int webBlocks = 0;
+        if (preventTreetopSpawn || allowNearCobwebs || allowMobSpawners) {
             int leafBlocks = 0;
+            int webBlocks = 0;
 
-            for (int y = wy - 5; y < wy + 5; y++) {
+            for (int y = wy - 2; y < wy + 1; y++) {
                 for (int x = wx - 5; x < wx + 5; x++) {
                     for (int z = wz - 5; z < wz + 5; z++) {
                         Material mat = Material.getMaterial(
                                 world.getBlockTypeIdAt(x, y, z));
 
-                        if (preventTreetopSpawn && mat == Material.LEAVES) {
-                            if (++leafBlocks >= leafLimit) {
-                                event.setCancelled(true);
-                                return;
-                            }
+                        if (preventTreetopSpawn &&
+                                mat == Material.LEAVES &&
+                                (++leafBlocks >= leafLimit)) {
+                            event.setCancelled(true);
+                            return;
                         }
 
-                        if (allowNearCobwebs && mat == Material.WEB) {
-                            if (++webBlocks >= cobwebLimit) {
-                                return;
-                            }
+                        if (allowNearCobwebs &&
+                                mat == Material.WEB &&
+                                (++webBlocks >= cobwebLimit)) {
+                            return;
                         }
 
-                        if (allowMobSpawners && mat == Material.MOB_SPAWNER) {
+                        if (allowMobSpawners &&
+                                mat == Material.MOB_SPAWNER) {
                             return;
                         }
                     }
@@ -132,10 +132,16 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
 
         int totalBlocks = 0;
         int detectBlocks = 0;
-        int bottom = Math.max(detectDepthLimit, wy - detectHeight);
-        for (int y = bottom; y < wy + detectHeight; y++) {
-            for (int x = wx - detectRadius; x < wx + detectRadius; x++) {
-                for (int z = wz - detectRadius; z < wz + detectRadius; z++) {
+        for (int y = Math.max(detectDepthLimit, wy - detectHeight);
+                 y < wy + detectHeight; 
+                 y++) {
+            for (int x = wx - detectRadius; 
+                     x < wx + detectRadius; 
+                     x++) {
+                for (int z = wz - detectRadius; 
+                         z < wz + detectRadius; 
+                         z++) {
+                    
                     Material mat = Material.getMaterial(
                             world.getBlockTypeIdAt(x, y, z));
 
@@ -152,11 +158,18 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                         int structureBlocks = 0;
 
                         structureDetectionLoop:
-                        for (int iy = wy - structureHeight; iy < wy + structureHeight; iy++) {
-                            for (int ix = wx - structureRadius; ix < wx + structureRadius; ix++) {
-                                for (int iz = wz - structureRadius; iz < wz + structureRadius; iz++) {
+                        for (int sy = wy - structureHeight; 
+                                 sy < wy + structureHeight; 
+                                 sy++) {
+                            for (int sx = wx - structureRadius; 
+                                     sx < wx + structureRadius; 
+                                     sx++) {
+                                for (int sz = wz - structureRadius; 
+                                         sz < wz + structureRadius; 
+                                         sz++) {
+                                    
                                     Material smat = Material.getMaterial(
-                                            world.getBlockTypeIdAt(ix, iy, iz));
+                                            world.getBlockTypeIdAt(sx, sy, sz));
 
                                     if (!detectBlockTypes.contains(smat)) {
                                         continue;
