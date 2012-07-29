@@ -70,7 +70,7 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         structureLimit = settings.getInt("structures.limit");
         allowMobSpawners = settings.getBoolean("spawners.allow");
         preventTreetopSpawn = !settings.getBoolean("treetops.allow");
-        leafLimit = settings.getInt("treetops.minimum_leaves");
+        leafLimit = settings.getInt("treetops.limit");
         allowNearCobwebs = settings.getBoolean("cobwebs.allow");
         cobwebLimit = settings.getInt("cobwebs.limit");
         detectRadius = settings.getInt("detect.radius");
@@ -193,9 +193,9 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
             } else if (setting.equalsIgnoreCase("treetops.allow")) {
                 preventTreetopSpawn = parseBooleanStrict(value);
                 settings.set("treetops.allow", preventTreetopSpawn);
-            } else if (setting.equalsIgnoreCase("treetops.minimum_leaves")) {
+            } else if (setting.equalsIgnoreCase("treetops.limit")) {
                 leafLimit = Integer.parseInt(value);
-                settings.set("treetops.minimum_leaves", leafLimit);
+                settings.set("treetops.limit", leafLimit);
             } else if (setting.equalsIgnoreCase("cobwebs.allow")) {
                 allowNearCobwebs = parseBooleanStrict(value);
                 settings.set("cobwebs.allow", allowNearCobwebs);
