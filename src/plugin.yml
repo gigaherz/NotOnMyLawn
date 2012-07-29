@@ -1,3 +1,19 @@
 name: NotOnMyLawn
 main: net.gigaherz.NotOnMyLawn.BukkitPlugin
-version: 1.0
+version: 1.1
+commands:
+   notonmylawn:
+     aliases: noml
+     description: Used to show or change settings for NotOnMyLawn.
+     usage: |
+       Usage:
+       /<command> reload
+       /<command> enable
+       /<command> disable
+       /<command> show <config name>
+       /<command> set <config name> <value>
+     permission: notonmylawn.config
+     permission-message: You need permission '<permission>' to use this command.
+permissions:
+  notonmylawn.config:
+    default: op
