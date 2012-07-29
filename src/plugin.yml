@@ -12,6 +12,8 @@ commands:
        /<command> disable
        /<command> show <config name>
        /<command> set <config name> <value>
+       Note: <config name> corresponds to the config.yml key path, separated by '.'
+       Example: /<command> set cobwebs.allow false
      permission: notonmylawn.config
      permission-message: You need permission '<permission>' to use this command.
 permissions:
