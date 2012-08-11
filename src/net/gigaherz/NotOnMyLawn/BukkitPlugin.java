@@ -1,6 +1,7 @@
 package net.gigaherz.NotOnMyLawn;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.bukkit.Location;
@@ -16,11 +17,16 @@ import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class BukkitPlugin extends JavaPlugin implements Listener {
+    
+    public final static List<String> reservedWords = new ArrayList<String>(Arrays.asList(
+            "enable", "range", "below", "above", "count", "hard_limit",
+            "blocks", "action", "priority", "fallback", "ignore_animals",
+            "min_height"));
 
     // general
     boolean enable;
     boolean ignoreAnimals;
-    int heightLimit;
+    int minHeight;
     List<Scanner> scanners = new ArrayList<Scanner>();
 
     @Override
@@ -29,7 +35,8 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
 
         if (!settings.getString("version").equals("1.2")) {
             getServer().getLogger().info(
-                    "[NotOnMyLawn] Unsupported config file, reloading defaults.");
+                    "[NotOnMyLawn] " +
+                    "Unsupported config file, reloading defaults.");
             saveDefaultConfig();
         }
 
@@ -53,7 +60,7 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
 
         enable = settings.getBoolean("enable");
         ignoreAnimals = settings.getBoolean("ignore_animals");
-        heightLimit = settings.getInt("min_height");
+        minHeight = settings.getInt("min_height");
 
         ConfigurationSection section =
                 settings.getConfigurationSection("scanners");
@@ -61,17 +68,20 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         try {
             for (String str : section.getKeys(false)) {
                 Scanner nest = new Scanner(str);
-                nest.LoadConfig(section.getConfigurationSection(str), getServer().getLogger());
+                nest.loadConfig(section.getConfigurationSection(str),
+                        getServer().getLogger());
                 scanners.add(nest);
             }
             Collections.sort(scanners, Scanner.Comparator);
         } catch (ConfigException e) {
-            getServer().getLogger().info("[NotOnMyLawn] "+e.getMessage()+".");
+            getServer().getLogger().info("[NotOnMyLawn] "
+                    + e.getMessage() + ".");
             setEnabled(false);
             return false;
         }
 
-        getServer().getLogger().info("[NotOnMyLawn] Configuration loaded: " + scanners.size() + " top-level scanners created.");
+        getServer().getLogger().info("[NotOnMyLawn] Configuration loaded: "
+                + scanners.size() + " top-level scanners created.");
         return true;
     }
 
@@ -114,36 +124,22 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                         sender.sendMessage("The plugin is currently disabled.");
                     }
                 } else {
-                    sender.sendMessage(
-                            "The current value of " + args[1] + " is: "
-                            + getConfig().get(args[1]).toString());
+                    sender.sendMessage(config(args[1], null));
                 }
             } else if (action.equalsIgnoreCase("set")) {
                 if (args.length < 3) {
                     return false;
                 }
-                switch (setConfig(args[1], args[2])) {
-                    case 0:
-                        if (args[1].equalsIgnoreCase("enable")) {
-                            if (enable) {
-                                sender.sendMessage(
-                                        "The plugin is now enabled.");
-                            } else {
-                                sender.sendMessage(
-                                        "The plugin is now disabled.");
-                            }
-                        } else {
-                            sender.sendMessage(
-                                    "The new value of " + args[1] + " is: "
-                                    + getConfig().get(args[1]).toString());
-                        }
-                    case -1:
-                        sender.sendMessage("Unknown setting.");
-                        break;
-                    case -2:
-                        sender.sendMessage("Invalid value.");
-                        break;
-                    default:
+                
+                if (args[1].equalsIgnoreCase("enable")) {
+                    config(args[1], args[2]);
+                    if (enable) {
+                        sender.sendMessage("The plugin is now enabled.");
+                    } else {
+                        sender.sendMessage("The plugin is now disabled.");
+                    }
+                } else {
+                    sender.sendMessage(config(args[1], args[2]));
                 }
             } else {
                 return false;
@@ -154,28 +150,74 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         return false;
     }
 
-    private int setConfig(String setting, String value) {
+    private String config(String key, String newValue) {
         Configuration settings = getConfig();
+        
+        String result;
 
+        int dot = key.indexOf('.');
+        
+        tryCatch:
         try {
-            if (setting.equalsIgnoreCase("enable")) {
-                enable = parseBooleanStrict(value);
-                settings.set("enable", enable);
-            } else if (setting.equalsIgnoreCase("ignore_animals")) {
-                ignoreAnimals = parseBooleanStrict(value);
-                settings.set("ignore_animals", ignoreAnimals);
+            if (key.equalsIgnoreCase("enable")) {
+                if(newValue != null) {
+                    enable = parseBooleanStrict(newValue);
+                    settings.set("enable", enable);
+                }
+                result = Boolean.toString(enable);
+            } else if (key.equalsIgnoreCase("ignore_animals")) {
+                if(newValue != null) {
+                    ignoreAnimals = parseBooleanStrict(newValue);
+                    settings.set("ignore_animals", ignoreAnimals);
+                }
+                result = Boolean.toString(ignoreAnimals);
+            } else if (key.equalsIgnoreCase("min_height")) {
+                if(newValue != null) {
+                    minHeight = Integer.parseInt(newValue);
+                    settings.set("min_height", minHeight);
+                }
+                result = Integer.toString(minHeight);
+            } else if(dot >= 0) {                
+                String str = key.substring(0, dot);
+                String sub = key.substring(dot+1);
+
+                for (String reserved : reservedWords) {
+                    if (reserved.equalsIgnoreCase(str)) {
+                        throw new ConfigException("key", "The specified scanner name is a reserved config keyword.");
+                    }
+                }
+                
+                ConfigurationSection config = getConfig().getConfigurationSection("scanners");
+
+                for(Scanner scanner : scanners) {
+                    if(scanner.name.equalsIgnoreCase(str)) {
+                        ConfigurationSection conf = config.getConfigurationSection(str);
+                        getLogger().warning("Found scanner '" + str + "'. " + (conf != null));
+                        result = scanner.config(conf, sub, newValue);
+                        break tryCatch;
+                    }
+                }
+                
+                throw new ConfigException("key", "The nested scanner was not found.");
             } else {
-                return -1;
+                throw new ConfigException("key", "The specified key does not correspond with any known setting key.");
             }
         } catch (NumberFormatException e) {
-            return -2;
+            return "Invalid setting '" + key + "': Unable to parse the value.";
+        } catch (ConfigException e) {
+            return e.getMessage();
         }
 
         saveConfig();
-        return 0;
+        
+        if(newValue != null) {
+           return "The new value of " + key + " is: " + result;
+        } else {
+           return "The current value of " + key + " is: " + result;
+        }
     }
 
-    public boolean parseBooleanStrict(String text)
+    public static boolean parseBooleanStrict(String text)
             throws NumberFormatException {
         if (text.equalsIgnoreCase("true") || text.equals("1")) {
             return true;
@@ -199,7 +241,7 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         Location loc = event.getLocation();
 
         int wy = loc.getBlockY();
-        if (wy < heightLimit) {
+        if (wy < minHeight) {
             return;
         }
 
@@ -210,7 +252,7 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
 
         loop:
         for (Scanner nest : scanners) {
-            switch (nest.RunScanner(world, wx, wy, wz)) {
+            switch (nest.runScanner(world, wx, wy, wz)) {
                 case PREVENT:
                     event.setCancelled(true);
                     return;

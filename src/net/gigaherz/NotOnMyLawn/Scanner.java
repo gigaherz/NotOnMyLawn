@@ -4,7 +4,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -17,9 +19,8 @@ public class Scanner {
             return o1.priority - o2.priority;
         }
     };
-    final static List<String> reservedWords = new ArrayList<String>(Arrays.asList(
-            "enable", "range", "below", "above", "count", "hard_limit",
-            "blocks", "action", "priority", "fallback"));
+    
+    
     Scanner parent = null;
     String name;
     boolean enable = true;
@@ -33,6 +34,18 @@ public class Scanner {
     int hardLimit = 50;
     List<Material> blocks = null;
     List<Scanner> nested = new ArrayList<Scanner>();
+
+    private List<Material> getBlocks() {
+        if (blocks != null) {
+            return blocks;
+        }
+
+        if (parent != null) {
+            return parent.getBlocks();
+        }
+
+        return null;
+    }
 
     public Scanner(String name) {
         this.name = name;
@@ -50,7 +63,7 @@ public class Scanner {
         count = 1;
     }
 
-    public void LoadConfig(ConfigurationSection config, Logger logger)
+    public void loadConfig(ConfigurationSection config, Logger logger)
             throws ConfigException {
 
         if (config == null) {
@@ -65,10 +78,10 @@ public class Scanner {
 
         if (parent == null) {
             if (action == Actions.COUNT || action == Actions.SKIP) {
-                throw new ConfigException("action");
+                throw new ConfigException("action", "Cannot use COUNT or SKIP in a root scanner.");
             }
             if (fallback == Actions.COUNT || fallback == Actions.SKIP) {
-                throw new ConfigException("fallback");
+                throw new ConfigException("fallback", "Cannot use COUNT or SKIP in a root scanner.");
             }
         }
 
@@ -103,12 +116,12 @@ public class Scanner {
                 }
             }
         } else if (parent == null) {
-            throw new ConfigException("blocks");
+            throw new ConfigException("blocks", "Cannot inherit blocks in a root scanner.");
         }
 
         keys:
         for (String str : config.getKeys(false)) {
-            for (String reserved : reservedWords) {
+            for (String reserved : BukkitPlugin.reservedWords) {
                 if (reserved.equalsIgnoreCase(str)) {
                     continue keys;
                 }
@@ -117,7 +130,7 @@ public class Scanner {
             ConfigurationSection sect =
                     config.getConfigurationSection(str);
             if (sect != null) {
-                nest.LoadConfig(sect, logger);
+                nest.loadConfig(sect, logger);
                 nested.add(nest);
             } else {
                 logger.warning("Skipped key " + str + " because it was not a section.");
@@ -126,20 +139,99 @@ public class Scanner {
 
         Collections.sort(nested, Scanner.Comparator);
     }
-
-    private List<Material> getBlocks() {
-        if (blocks != null) {
-            return blocks;
-        }
-
-        if (parent != null) {
-            return parent.getBlocks();
-        }
-
-        return null;
+    
+    public String config(ConfigurationSection config, String key, String newValue)
+            throws ConfigException {
+        
+        int dot = key.indexOf('.');
+        if(dot >= 0) {
+            String str = key.substring(0, dot);
+            String sub = key.substring(dot+1);
+            
+            for (String reserved : BukkitPlugin.reservedWords) {
+                if (reserved.equalsIgnoreCase(str)) {
+                    throw new ConfigException("key", "The specified scanner name is a reserved config keyword.");
+                }
+            }
+            
+            for(Scanner scanner : nested) {
+              if(scanner.name.equalsIgnoreCase(str)) {
+                  ConfigurationSection conf = config.getConfigurationSection(str);
+                  return scanner.config(conf, sub, newValue);
+              }
+            }
+            
+            throw new ConfigException("key", "The nested scanner was not found.");
+        } else {
+            if(key.equalsIgnoreCase("enable")){
+                if(newValue != null) {
+                    enable = BukkitPlugin.parseBooleanStrict(newValue);
+                    config.set("enable", enable);
+                }
+                return Boolean.toString(enable);
+            }
+            else if(key.equalsIgnoreCase("action")){
+                if(newValue != null) {
+                    action = Actions.valueOf(newValue);
+                    config.set("action", action.toString());
+                }
+                return action.toString();
+            }
+            else if(key.equalsIgnoreCase("fallback")){
+                if(newValue != null) {
+                    fallback = Actions.valueOf(newValue);
+                    config.set("fallback", fallback.toString());
+                }
+                return fallback.toString();
+            }
+            else if(key.equalsIgnoreCase("priority")){
+                if(newValue != null) {
+                    priority = Integer.parseInt(newValue);
+                    config.set("priority", priority);
+                }
+                return Integer.toString(priority);
+            }
+            else if(key.equalsIgnoreCase("range")){
+                if(newValue != null) {
+                    range = Integer.parseInt(newValue);
+                    config.set("range", range);
+                }
+                return Integer.toString(range);
+            }
+            else if(key.equalsIgnoreCase("below")){
+                if(newValue != null) {
+                    below = Integer.parseInt(newValue);
+                    config.set("below", below);
+                }
+                return Integer.toString(below);
+            }
+            else if(key.equalsIgnoreCase("above")){
+                if(newValue != null) {
+                    above = Integer.parseInt(newValue);
+                    config.set("above", above);
+                }
+                return Integer.toString(above);
+            }
+            else if(key.equalsIgnoreCase("count")){
+                if(newValue != null) {
+                    count = Integer.parseInt(newValue);
+                    config.set("count", count);
+                }
+                return Integer.toString(count);
+            }
+            else if(key.equalsIgnoreCase("hard_limit")){
+                if(newValue != null) {
+                    hardLimit = Integer.parseInt(newValue);
+                    config.set("hard_limit", hardLimit);
+                }
+                return Integer.toString(hardLimit);
+            } else {
+                throw new ConfigException("key", "The specified key does not correspond with any known setting key.");
+            }
+        }      
     }
-
-    public Actions RunScanner(World world, int wx, int wy, int wz) {
+    
+    public Actions runScanner(World world, int wx, int wy, int wz) {
         int counter = 0;
         int hardCounter = 0;
 
@@ -165,7 +257,7 @@ public class Scanner {
                     if (nested.size() > 0) {
                         loop:
                         for (Scanner nest : nested) {
-                            switch (nest.RunScanner(world, x, y, z)) {
+                            switch (nest.runScanner(world, x, y, z)) {
                                 case PREVENT:
                                     return Actions.PREVENT;
                                 case ALLOW:
