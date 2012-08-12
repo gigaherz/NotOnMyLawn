@@ -32,8 +32,14 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
     @Override
     public void onEnable() {
         Configuration settings = getConfig();
-
-        if (!settings.getString("version").equals("1.2")) {
+        
+        if (!settings.isSet("version")) {  
+            getServer().getLogger().info(
+                    "[NotOnMyLawn] " +
+                    "Outdated or missing config file, (re)loading defaults.");
+            saveDefaultConfig();
+        }
+        else if (!settings.getString("version").equals("1.2")) {
             getServer().getLogger().info(
                     "[NotOnMyLawn] " +
                     "Unsupported config file, reloading defaults.");
@@ -66,6 +72,7 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                 settings.getConfigurationSection("scanners");
 
         try {
+            scanners.clear();
             for (String str : section.getKeys(false)) {
                 Scanner nest = new Scanner(str);
                 nest.loadConfig(section.getConfigurationSection(str),
@@ -109,9 +116,11 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
             } else if (action.equalsIgnoreCase("reload")) {
                 setEnabled(false);
                 if (!loadSettings()) {
+                    sender.sendMessage("NotOnMyLawn config reload failed.");
                     return true;
                 }
                 setEnabled(true);
+                sender.sendMessage("NotOnMyLawn config reloaded.");
             } else if (action.equalsIgnoreCase("show")) {
                 if (args.length < 2) {
                     return false;
@@ -141,6 +150,12 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                 } else {
                     sender.sendMessage(config(args[1], args[2]));
                 }
+            } else if (action.equalsIgnoreCase("describe")) {
+                if (args.length < 2) {
+                    return false;
+                }
+
+                describe(sender, args[1]);
             } else {
                 return false;
             }
@@ -271,6 +286,41 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                     setEnabled(false);
                     return;
             }
+        }
+    }
+
+    private void describe(CommandSender sender, String key) {
+
+        List<Scanner> list = scanners;
+        String str = key;
+        String sub;
+
+        next:
+        while(list != null) {
+            int dot = str.indexOf('.');
+
+            if(dot >= 0) {
+                String tmp = str.substring(0, dot);
+                sub = str.substring(dot+1);
+                str = tmp;
+            } else {
+                sub="";
+            }
+
+            for(Scanner scanner : scanners) {
+                if(scanner.name.equalsIgnoreCase(str)) {
+                    if(sub.length() > 0) {
+                        list = scanner.nested;
+                        continue next;
+                    } else {
+                        sender.sendMessage(scanner.toString());
+                        return;
+                    }
+                }
+            }
+
+            sender.sendMessage("Invalid key '"+key+"': The nested scanner was not found.");                
+            return;
         }
     }
 }

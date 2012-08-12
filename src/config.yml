@@ -56,7 +56,7 @@ scanners:
         action: prevent
         count: 4
         above: 1
-        blocks: LEAF
+        blocks: LEAVES
     spawners:               # Spawns near a spawner or cobweb
         action: allow
-        blocks: [ MOB_SPAWNER, COBWEB ]
+        blocks: [ MOB_SPAWNER, WEB ]

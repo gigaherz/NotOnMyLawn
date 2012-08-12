@@ -1,12 +1,9 @@
 package net.gigaherz.NotOnMyLawn;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -19,7 +16,6 @@ public class Scanner {
             return o1.priority - o2.priority;
         }
     };
-    
     
     Scanner parent = null;
     String name;
@@ -93,27 +89,40 @@ public class Scanner {
         hardLimit = config.getInt("hard_limit", hardLimit);
 
         if (config.contains("blocks")) {
+            String sBlocks = config.getString("blocks");
             List<String> oBlocks = config.getStringList("blocks");
-
-            if (oBlocks.size() == 1) {
-                String sBlocks = oBlocks.get(0);
+                        
+            if (oBlocks.isEmpty() && sBlocks != null) {
 
                 if (!sBlocks.equalsIgnoreCase("inherit")) {
                     if (blocks == null) {
                         blocks = new ArrayList<Material>();
+                    } else {
+                        blocks.clear();
                     }
 
                     blocks.add(Material.getMaterial(sBlocks));
+                } else {
+                    blocks = null;
                 }
-            } else if (oBlocks instanceof List) {
+            } else if(!oBlocks.isEmpty()) {
                 if (blocks == null) {
                     blocks = new ArrayList<Material>();
+                } else {
+                    blocks.clear();
                 }
 
                 List<String> blockTypes = (List<String>) oBlocks;
                 for (String bType : blockTypes) {
-                    blocks.add(Material.getMaterial(bType));
+                    Material mat = Material.getMaterial(bType);
+                    if(mat == null) {
+                        throw new ConfigException("blocks", "Invalid material name '"+bType+"'.");
+                    } else {
+                        blocks.add(mat);
+                    }
                 }
+            } else {
+                throw new ConfigException("blocks", "A scanner requires at least one block to match.");
             }
         } else if (parent == null) {
             throw new ConfigException("blocks", "Cannot inherit blocks in a root scanner.");
@@ -172,14 +181,14 @@ public class Scanner {
             }
             else if(key.equalsIgnoreCase("action")){
                 if(newValue != null) {
-                    action = Actions.valueOf(newValue);
+                    action = Actions.valueOf(newValue.toUpperCase());
                     config.set("action", action.toString());
                 }
                 return action.toString();
             }
             else if(key.equalsIgnoreCase("fallback")){
                 if(newValue != null) {
-                    fallback = Actions.valueOf(newValue);
+                    fallback = Actions.valueOf(newValue.toUpperCase());
                     config.set("fallback", fallback.toString());
                 }
                 return fallback.toString();
@@ -283,5 +292,38 @@ public class Scanner {
         }
 
         return fallback;
+    }
+    
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        
+        sb.append("Scanner ");
+        sb.append(name);
+        sb.append(" { ");
+        sb.append(enable?"enabled, ":"disabled, ");
+        sb.append("priority "); sb.append(priority); sb.append(", ");
+        sb.append("range ["); sb.append(range); sb.append(", ");
+        sb.append(-below); sb.append(", "); sb.append(above); sb.append("], ");
+        sb.append("limit "); sb.append(count);
+        sb.append(" hard "); sb.append(hardLimit); sb.append(", ");
+        
+        // blocks
+        List<Material> mats = getBlocks();
+        if(mats.isEmpty()) {
+            sb.append("NO BLOCKS, ");
+        } else {
+            sb.append(" blocks [");
+            sb.append(mats.get(0).toString());
+            for(int i=1;i<mats.size();i++) {
+                sb.append(", ");
+                sb.append(mats.get(i).toString());
+            }
+            sb.append("], ");
+        }
+        sb.append(nested.size()); sb.append(" nested scanners");
+        sb.append("};");
+        
+        return sb.toString();
     }
 }
