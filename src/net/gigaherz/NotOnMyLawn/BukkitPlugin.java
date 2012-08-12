@@ -1,55 +1,54 @@
 package net.gigaherz.NotOnMyLawn;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.configuration.Configuration;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Animals;
-import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
-import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class BukkitPlugin extends JavaPlugin implements Listener {
+    
+    public final static List<String> reservedWords = new ArrayList<String>(Arrays.asList(
+            "enable", "range", "below", "above", "count", "hard_limit",
+            "blocks", "action", "priority", "fallback", "ignore_animals",
+            "min_height"));
 
     // general
     boolean enable;
     boolean ignoreAnimals;
-    // section detect
-    int detectRadius;
-    int detectHeight;
-    int detectLimit;
-    int detectHardLimit;
-    int detectDepthLimit;
-    List<Material> detectBlockTypes = new ArrayList<Material>();
-    // section detect structures
-    boolean detectStructures;
-    int structureRadius;
-    int structureHeight;
-    int structureLimit;
-    // section cobwebs
-    boolean allowNearCobwebs;
-    int cobwebLimit;
-    // section spawners
-    boolean allowMobSpawners;
-    // section treetops
-    boolean preventTreetopSpawn;
-    int leafLimit;
+    int minHeight;
+    List<Scanner> scanners = new ArrayList<Scanner>();
 
     @Override
     public void onEnable() {
         Configuration settings = getConfig();
+        
+        if (!settings.isSet("version")) {  
+            getServer().getLogger().info(
+                    "[NotOnMyLawn] " +
+                    "Outdated or missing config file, (re)loading defaults.");
+            saveDefaultConfig();
+        }
+        else if (!settings.getString("version").equals("1.2")) {
+            getServer().getLogger().info(
+                    "[NotOnMyLawn] " +
+                    "Unsupported config file, reloading defaults.");
+            saveDefaultConfig();
+        }
 
-        settings.options().copyDefaults(true);
-        saveConfig();
-
-        loadSettings();
+        if (!loadSettings()) {
+            return;
+        }
 
         getServer().getPluginManager().registerEvents(this, this);
         getServer().getLogger().info("[NotOnMyLawn] Is now Enabled.");
@@ -60,32 +59,37 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         getServer().getLogger().info("[NotOnMyLawn] disabled.");
     }
 
-    private void loadSettings() {
+    private boolean loadSettings() {
+        reloadConfig();
+
         Configuration settings = getConfig();
+
         enable = settings.getBoolean("enable");
         ignoreAnimals = settings.getBoolean("ignore_animals");
-        detectStructures = settings.getBoolean("structures.detect");
-        structureRadius = settings.getInt("structures.radius");
-        structureHeight = settings.getInt("structures.height");
-        structureLimit = settings.getInt("structures.limit");
-        allowMobSpawners = settings.getBoolean("spawners.allow");
-        preventTreetopSpawn = !settings.getBoolean("treetops.allow");
-        leafLimit = settings.getInt("treetops.minimum_leaves");
-        allowNearCobwebs = settings.getBoolean("cobwebs.allow");
-        cobwebLimit = settings.getInt("cobwebs.limit");
-        detectRadius = settings.getInt("detect.radius");
-        detectHeight = settings.getInt("detect.height");
-        detectLimit = settings.getInt("detect.limit");
-        detectHardLimit = settings.getInt("detect.hard_limit");
-        detectDepthLimit = settings.getInt("detect.depth_limit");
-        detectBlockTypes.clear();
+        minHeight = settings.getInt("min_height");
 
-        List<String> blockTypes = settings.getStringList("detect.block_types");
-        for (String bType : blockTypes) {
-            detectBlockTypes.add(Material.getMaterial(bType));
+        ConfigurationSection section =
+                settings.getConfigurationSection("scanners");
+
+        try {
+            scanners.clear();
+            for (String str : section.getKeys(false)) {
+                Scanner nest = new Scanner(str);
+                nest.loadConfig(section.getConfigurationSection(str),
+                        getServer().getLogger());
+                scanners.add(nest);
+            }
+            Collections.sort(scanners, Scanner.Comparator);
+        } catch (ConfigException e) {
+            getServer().getLogger().info("[NotOnMyLawn] "
+                    + e.getMessage() + ".");
+            setEnabled(false);
+            return false;
         }
 
-        getServer().getLogger().info("[NotOnMyLawn] Configuration loaded.");
+        getServer().getLogger().info("[NotOnMyLawn] Configuration loaded: "
+                + scanners.size() + " top-level scanners created.");
+        return true;
     }
 
     @Override
@@ -111,8 +115,12 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                 }
             } else if (action.equalsIgnoreCase("reload")) {
                 setEnabled(false);
-                loadSettings();
+                if (!loadSettings()) {
+                    sender.sendMessage("NotOnMyLawn config reload failed.");
+                    return true;
+                }
                 setEnabled(true);
+                sender.sendMessage("NotOnMyLawn config reloaded.");
             } else if (action.equalsIgnoreCase("show")) {
                 if (args.length < 2) {
                     return false;
@@ -125,37 +133,29 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
                         sender.sendMessage("The plugin is currently disabled.");
                     }
                 } else {
-                    sender.sendMessage(
-                            "The current value of " + args[1] + " is: "
-                            + getConfig().get(args[1]).toString());
+                    sender.sendMessage(config(args[1], null));
                 }
             } else if (action.equalsIgnoreCase("set")) {
                 if (args.length < 3) {
                     return false;
                 }
-                switch (setConfig(args[1], args[2])) {
-                    case 0:
-                        if (args[1].equalsIgnoreCase("enable")) {
-                            if (enable) {
-                                sender.sendMessage(
-                                        "The plugin is now enabled.");
-                            } else {
-                                sender.sendMessage(
-                                        "The plugin is now disabled.");
-                            }
-                        } else {
-                            sender.sendMessage(
-                                    "The new value of " + args[1] + " is: "
-                                    + getConfig().get(args[1]).toString());
-                        }
-                    case -1:
-                        sender.sendMessage("Unknown setting.");
-                        break;
-                    case -2:
-                        sender.sendMessage("Invalid value.");
-                        break;
-                    default:
+                
+                if (args[1].equalsIgnoreCase("enable")) {
+                    config(args[1], args[2]);
+                    if (enable) {
+                        sender.sendMessage("The plugin is now enabled.");
+                    } else {
+                        sender.sendMessage("The plugin is now disabled.");
+                    }
+                } else {
+                    sender.sendMessage(config(args[1], args[2]));
                 }
+            } else if (action.equalsIgnoreCase("describe")) {
+                if (args.length < 2) {
+                    return false;
+                }
+
+                describe(sender, args[1]);
             } else {
                 return false;
             }
@@ -165,70 +165,74 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         return false;
     }
 
-    private int setConfig(String setting, String value) {
+    private String config(String key, String newValue) {
         Configuration settings = getConfig();
+        
+        String result;
 
+        int dot = key.indexOf('.');
+        
+        tryCatch:
         try {
-            if (setting.equalsIgnoreCase("enable")) {
-                enable = parseBooleanStrict(value);
-                settings.set("enable", enable);
-            } else if (setting.equalsIgnoreCase("ignore_animals")) {
-                ignoreAnimals = parseBooleanStrict(value);
-                settings.set("ignore_animals", ignoreAnimals);
-            } else if (setting.equalsIgnoreCase("structures.detect")) {
-                detectStructures = parseBooleanStrict(value);
-                settings.set("structures.detect", detectStructures);
-            } else if (setting.equalsIgnoreCase("structures.radius")) {
-                structureRadius = Integer.parseInt(value);
-                settings.set("structures.radius", structureRadius);
-            } else if (setting.equalsIgnoreCase("structures.height")) {
-                structureHeight = Integer.parseInt(value);
-                settings.set("structures.height", structureHeight);
-            } else if (setting.equalsIgnoreCase("structures.limit")) {
-                structureLimit = Integer.parseInt(value);
-                settings.set("structures.limit", structureLimit);
-            } else if (setting.equalsIgnoreCase("spawners.allow")) {
-                allowMobSpawners = parseBooleanStrict(value);
-                settings.set("spawners.allow", allowMobSpawners);
-            } else if (setting.equalsIgnoreCase("treetops.allow")) {
-                preventTreetopSpawn = parseBooleanStrict(value);
-                settings.set("treetops.allow", preventTreetopSpawn);
-            } else if (setting.equalsIgnoreCase("treetops.minimum_leaves")) {
-                leafLimit = Integer.parseInt(value);
-                settings.set("treetops.minimum_leaves", leafLimit);
-            } else if (setting.equalsIgnoreCase("cobwebs.allow")) {
-                allowNearCobwebs = parseBooleanStrict(value);
-                settings.set("cobwebs.allow", allowNearCobwebs);
-            } else if (setting.equalsIgnoreCase("cobwebs.limit")) {
-                cobwebLimit = Integer.parseInt(value);
-                settings.set("cobwebs.limit", cobwebLimit);
-            } else if (setting.equalsIgnoreCase("detect.radius")) {
-                detectRadius = Integer.parseInt(value);
-                settings.set("detect.radius", detectRadius);
-            } else if (setting.equalsIgnoreCase("detect.height")) {
-                detectHeight = Integer.parseInt(value);
-                settings.set("detect.height", detectHeight);
-            } else if (setting.equalsIgnoreCase("detect.limit")) {
-                detectLimit = Integer.parseInt(value);
-                settings.set("detect.limit", detectLimit);
-            } else if (setting.equalsIgnoreCase("detect.hard_limit")) {
-                detectHardLimit = Integer.parseInt(value);
-                settings.set("detect.hard_limit", detectHardLimit);
-            } else if (setting.equalsIgnoreCase("detect.depth_limit")) {
-                detectDepthLimit = Integer.parseInt(value);
-                settings.set("detect.depth_limit", detectDepthLimit);
+            if (key.equalsIgnoreCase("enable")) {
+                if(newValue != null) {
+                    enable = parseBooleanStrict(newValue);
+                    settings.set("enable", enable);
+                }
+                result = Boolean.toString(enable);
+            } else if (key.equalsIgnoreCase("ignore_animals")) {
+                if(newValue != null) {
+                    ignoreAnimals = parseBooleanStrict(newValue);
+                    settings.set("ignore_animals", ignoreAnimals);
+                }
+                result = Boolean.toString(ignoreAnimals);
+            } else if (key.equalsIgnoreCase("min_height")) {
+                if(newValue != null) {
+                    minHeight = Integer.parseInt(newValue);
+                    settings.set("min_height", minHeight);
+                }
+                result = Integer.toString(minHeight);
+            } else if(dot >= 0) {                
+                String str = key.substring(0, dot);
+                String sub = key.substring(dot+1);
+
+                for (String reserved : reservedWords) {
+                    if (reserved.equalsIgnoreCase(str)) {
+                        throw new ConfigException("key", "The specified scanner name is a reserved config keyword.");
+                    }
+                }
+                
+                ConfigurationSection config = getConfig().getConfigurationSection("scanners");
+
+                for(Scanner scanner : scanners) {
+                    if(scanner.name.equalsIgnoreCase(str)) {
+                        ConfigurationSection conf = config.getConfigurationSection(str);
+                        getLogger().warning("Found scanner '" + str + "'. " + (conf != null));
+                        result = scanner.config(conf, sub, newValue);
+                        break tryCatch;
+                    }
+                }
+                
+                throw new ConfigException("key", "The nested scanner was not found.");
             } else {
-                return -1;
+                throw new ConfigException("key", "The specified key does not correspond with any known setting key.");
             }
         } catch (NumberFormatException e) {
-            return -2;
+            return "Invalid setting '" + key + "': Unable to parse the value.";
+        } catch (ConfigException e) {
+            return e.getMessage();
         }
 
         saveConfig();
-        return 0;
+        
+        if(newValue != null) {
+           return "The new value of " + key + " is: " + result;
+        } else {
+           return "The current value of " + key + " is: " + result;
+        }
     }
 
-    public boolean parseBooleanStrict(String text)
+    public static boolean parseBooleanStrict(String text)
             throws NumberFormatException {
         if (text.equalsIgnoreCase("true") || text.equals("1")) {
             return true;
@@ -252,7 +256,7 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
         Location loc = event.getLocation();
 
         int wy = loc.getBlockY();
-        if (wy < detectDepthLimit) {
+        if (wy < minHeight) {
             return;
         }
 
@@ -261,102 +265,62 @@ public class BukkitPlugin extends JavaPlugin implements Listener {
 
         World world = event.getEntity().getWorld();
 
-        if (preventTreetopSpawn || allowNearCobwebs || allowMobSpawners) {
-            int leafBlocks = 0;
-            int webBlocks = 0;
-
-            for (int y = wy - 2; y < wy + 1; y++) {
-                for (int x = wx - 5; x < wx + 5; x++) {
-                    for (int z = wz - 5; z < wz + 5; z++) {
-                        Material mat = Material.getMaterial(
-                                world.getBlockTypeIdAt(x, y, z));
-
-                        if (preventTreetopSpawn
-                                && mat == Material.LEAVES
-                                && (++leafBlocks >= leafLimit)) {
-                            event.setCancelled(true);
-                            return;
-                        }
-
-                        if (allowNearCobwebs
-                                && mat == Material.WEB
-                                && (++webBlocks >= cobwebLimit)) {
-                            return;
-                        }
-
-                        if (allowMobSpawners
-                                && mat == Material.MOB_SPAWNER) {
-                            return;
-                        }
-                    }
-                }
+        loop:
+        for (Scanner nest : scanners) {
+            switch (nest.runScanner(world, wx, wy, wz)) {
+                case PREVENT:
+                    event.setCancelled(true);
+                    return;
+                case ALLOW:
+                    return;
+                case CONTINUE:
+                    return;
+                case COUNT:
+                    getServer().getLogger()
+                            .info("[NotOnMyLawn] Invalid state.");
+                    setEnabled(false);
+                    return;
+                case SKIP:
+                    getServer().getLogger()
+                            .info("[NotOnMyLawn] Invalid state.");
+                    setEnabled(false);
+                    return;
             }
         }
+    }
 
-        int totalBlocks = 0;
-        int detectBlocks = 0;
-        for (int y = Math.max(detectDepthLimit, wy - detectHeight);
-                y < wy + detectHeight;
-                y++) {
-            for (int x = wx - detectRadius;
-                    x < wx + detectRadius;
-                    x++) {
-                for (int z = wz - detectRadius;
-                        z < wz + detectRadius;
-                        z++) {
+    private void describe(CommandSender sender, String key) {
 
-                    Material mat = Material.getMaterial(
-                            world.getBlockTypeIdAt(x, y, z));
+        List<Scanner> list = scanners;
+        String str = key;
+        String sub;
 
-                    if (!detectBlockTypes.contains(mat)) {
-                        continue;
-                    }
+        next:
+        while(list != null) {
+            int dot = str.indexOf('.');
 
-                    if (++totalBlocks >= detectHardLimit) {
-                        event.setCancelled(true);
-                        return;
-                    }
+            if(dot >= 0) {
+                String tmp = str.substring(0, dot);
+                sub = str.substring(dot+1);
+                str = tmp;
+            } else {
+                sub="";
+            }
 
-                    if (detectStructures) {
-                        int structureBlocks = 0;
-
-                        structureDetectionLoop:
-                        for (int sy = wy - structureHeight;
-                                sy < wy + structureHeight;
-                                sy++) {
-                            for (int sx = wx - structureRadius;
-                                    sx < wx + structureRadius;
-                                    sx++) {
-                                for (int sz = wz - structureRadius;
-                                        sz < wz + structureRadius;
-                                        sz++) {
-
-                                    Material smat = Material.getMaterial(
-                                            world.getBlockTypeIdAt(sx, sy, sz));
-
-                                    if (!detectBlockTypes.contains(smat)) {
-                                        continue;
-                                    }
-
-                                    if (++structureBlocks < structureLimit) {
-                                        continue;
-                                    }
-
-                                    if (++detectBlocks >= detectLimit) {
-                                        event.setCancelled(true);
-                                        return;
-                                    }
-
-                                    break structureDetectionLoop;
-                                }
-                            }
-                        }
-                    } else if (++detectBlocks >= detectLimit) {
-                        event.setCancelled(true);
+            for(Scanner scanner : scanners) {
+                if(scanner.name.equalsIgnoreCase(str)) {
+                    if(sub.length() > 0) {
+                        list = scanner.nested;
+                        continue next;
+                    } else {
+                        sender.sendMessage(scanner.toString());
                         return;
                     }
                 }
             }
+
+            sender.sendMessage("Invalid key '"+key+"': The nested scanner was not found.");                
+            return;
         }
     }
 }

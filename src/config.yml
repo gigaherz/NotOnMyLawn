@@ -1,52 +1,62 @@
-enable: true          # Global enable toggle for the plugin
-ignore_animals: true  # If true, the plugin does not prevent animals from spawning
-detect:       # Detection-specitic settings
-  radius: 15        # Size of the detection square measured around the spawning block
-  height: 5         # Vertical size of the detection box, both above and below the spawn
-  limit: 10         # Number of blocks matched after which the spawning is disallowed
-  depth_limit: 50   # Allows all spawns to happen below this height
-  hard_limit: 500   # Hard limit of detected blocks after which the spawn is disallowed
-  block_types:      # List of blocks that will be used to detect man-made structures
-  - WOOD
-  - COBBLESTONE
-  - DIAMOND_BLOCK
-  - BRICK
-  - FENCE
-  - GOLD_BLOCK
-  - IRON_BLOCK
-  - LAPIS_BLOCK
-  - SNOW_BLOCK
-  - COBBLESTONE_STAIRS
-  - WOOD_STAIRS
-  - WOODEN_DOOR
-  - IRON_DOOR
-  - STEP
-  - DOUBLE_STEP
-  - WOOL
-  - BED_BLOCK
-  - CHEST
-  - FENCE_GATE
-  - MOSSY_COBBLESTONE
-  - SMOOTH_BRICK
-  - SMOOTH_STAIRS
-  - THIN_GLASS
-  - TRAP_DOOR
-  - OBSIDIAN
-  - BEDROCK
-  - IRON_DOOR_BLOCK
-  - IRON_FENCE
-  - NETHER_BRICK
-  - NETHER_FENCE
-structures: # Structure detection settings
-  detect: true
-  radius: 5
-  height: 2
-  limit: 3
-treetops:   # Treetop spawn prevention
-  allow: false
-  minimum_leaves: 4
-spawners:   # Spawns near a spawner
-  allow: true
-cobwebs:    # Spawns near a cobweb
-  allow: true
-  limit: 1  # Number of cobweb blocks required to allow the spawn
+version: 1.2
+enable: true                # Global enable toggle for the plugin
+ignore_animals: true        # If true, the plugin does not prevent animals from spawning
+min_height: 50              # Allows all spawns to happen below this height
+scanners:
+    main:
+        enable: true          # Activate this scanner (default true)
+        action: prevent       # Action to perform on detection: prevent, allow or Continue
+        fallback: continue    # Action to perform if requirements not met (default: continue)
+        priority: 0           # Higher priority scanners are run first (default 1)
+        range: 15             # Size of the detection square measured around the spawning block (default 5)
+        below: 5              # Number of blocks below the spawn position (default 2)
+        above: 5              # Number of blocks above the spawn position (default 2)
+        count: 10             # Number of blocks matched after which the action is performed (default 1)
+        hard_limit: 50        # Hard limit of detected blocks after which the action is performed
+        blocks:               # List of blocks that will be used to trigger the action (at least 1 required)
+        - WOOD
+        - COBBLESTONE
+        - DIAMOND_BLOCK
+        - BRICK
+        - FENCE
+        - GOLD_BLOCK
+        - IRON_BLOCK
+        - LAPIS_BLOCK
+        - SNOW_BLOCK
+        - COBBLESTONE_STAIRS
+        - WOOD_STAIRS
+        - WOODEN_DOOR
+        - IRON_DOOR
+        - STEP
+        - DOUBLE_STEP
+        - WOOL
+        - BED_BLOCK
+        - CHEST
+        - FENCE_GATE
+        - MOSSY_COBBLESTONE
+        - SMOOTH_BRICK
+        - SMOOTH_STAIRS
+        - THIN_GLASS
+        - TRAP_DOOR
+        - OBSIDIAN
+        - BEDROCK
+        - IRON_DOOR_BLOCK
+        - IRON_FENCE
+        - NETHER_BRICK
+        - NETHER_FENCE
+        structures:           # Nested scanners run for each of the parent blocks (slow! do not nest more than once!)
+            action: count       # New actions: count, skip; "continue" not available here (default count)
+            fallback: skip      # Same as action (default skip)
+            range: 5            # Same as top-level (default 0)
+            below: 2            # Same as top-level (default 0)
+            above: 2            # Same as top-level (default 0)
+            count: 3            # Same as top-level (default 1)
+            blocks: inherit     # List or "inherit" (use same blocks as parent) (default inherit)
+    treetops:               # Treetop scanner
+        action: prevent
+        count: 4
+        above: 1
+        blocks: LEAVES
+    spawners:               # Spawns near a spawner or cobweb
+        action: allow
+        blocks: [ MOB_SPAWNER, WEB ]
