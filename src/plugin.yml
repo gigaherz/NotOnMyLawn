@@ -1,6 +1,6 @@
 name: NotOnMyLawn
 main: net.gigaherz.NotOnMyLawn.BukkitPlugin
-version: 1.2
+version: 1.2.1
 commands:
    notonmylawn:
      aliases: noml
