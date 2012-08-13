@@ -16,20 +16,30 @@ public class Scanner {
             return o1.priority - o2.priority;
         }
     };
-    
-    Scanner parent = null;
+    Scanner parent;
     String name;
-    boolean enable = true;
-    Actions action = Actions.PREVENT;
-    Actions fallback = Actions.CONTINUE;
-    int priority = 1;
-    int range = 5;
-    int below = 2;
-    int above = 2;
-    int count = 1;
-    int hardLimit = 50;
+    boolean enable;
+    Actions action;
+    Actions fallback;
+    int priority;
+    int range;
+    int below;
+    int above;
+    int count;
+    int hardLimit;
     List<Material> blocks = null;
     List<Scanner> nested = new ArrayList<Scanner>();
+
+    public Scanner(String name) {
+        this.name = name;
+        setDefaults();
+    }
+
+    public Scanner(String name, Scanner parent) {
+        this.parent = parent;
+        this.name = name;
+        setDefaults();
+    }
 
     private List<Material> getBlocks() {
         if (blocks != null) {
@@ -43,20 +53,24 @@ public class Scanner {
         return null;
     }
 
-    public Scanner(String name) {
-        this.name = name;
-        blocks = new ArrayList<Material>();
-    }
-
-    public Scanner(String name, Scanner parent) {
-        this.parent = parent;
-        this.name = name;
-        action = Actions.COUNT;
-        fallback = Actions.SKIP;
-        range = 0;
-        below = 0;
-        above = 0;
-        count = 1;
+    private void setDefaults() {
+        enable = true;
+        priority = 1;
+        if (parent == null) {
+            action = Actions.PREVENT;
+            fallback = Actions.CONTINUE;
+            range = 5;
+            below = 2;
+            above = 2;
+            count = 1;
+        } else {
+            action = Actions.COUNT;
+            fallback = Actions.SKIP;
+            range = 0;
+            below = 0;
+            above = 0;
+            count = 1;
+        }
     }
 
     public void loadConfig(ConfigurationSection config, Logger logger)
@@ -65,6 +79,8 @@ public class Scanner {
         if (config == null) {
             throw new ConfigException("config");
         }
+
+        setDefaults();
 
         String act = config.getString("action", action.toString());
         String fal = config.getString("fallback", fallback.toString());
@@ -86,12 +102,18 @@ public class Scanner {
         below = config.getInt("below", below);
         above = config.getInt("above", above);
         count = config.getInt("count", count);
+
+        int base = (range * 2 + 1) * (range * 2 + 1);
+        int height = below + above + 1;
+        int totalBlocks = base * height;
+
+        hardLimit = totalBlocks / 10; // default hardLimit to 10% of the total blocks
         hardLimit = config.getInt("hard_limit", hardLimit);
 
         if (config.contains("blocks")) {
             String sBlocks = config.getString("blocks");
             List<String> oBlocks = config.getStringList("blocks");
-                        
+
             if (oBlocks.isEmpty() && sBlocks != null) {
 
                 if (!sBlocks.equalsIgnoreCase("inherit")) {
@@ -105,7 +127,7 @@ public class Scanner {
                 } else {
                     blocks = null;
                 }
-            } else if(!oBlocks.isEmpty()) {
+            } else if (!oBlocks.isEmpty()) {
                 if (blocks == null) {
                     blocks = new ArrayList<Material>();
                 } else {
@@ -115,8 +137,8 @@ public class Scanner {
                 List<String> blockTypes = (List<String>) oBlocks;
                 for (String bType : blockTypes) {
                     Material mat = Material.getMaterial(bType);
-                    if(mat == null) {
-                        throw new ConfigException("blocks", "Invalid material name '"+bType+"'.");
+                    if (mat == null) {
+                        throw new ConfigException("blocks", "Invalid material name '" + bType + "'.");
                     } else {
                         blocks.add(mat);
                     }
@@ -148,88 +170,80 @@ public class Scanner {
 
         Collections.sort(nested, Scanner.Comparator);
     }
-    
+
     public String config(ConfigurationSection config, String key, String newValue)
             throws ConfigException {
-        
+
         int dot = key.indexOf('.');
-        if(dot >= 0) {
+        if (dot >= 0) {
             String str = key.substring(0, dot);
-            String sub = key.substring(dot+1);
-            
+            String sub = key.substring(dot + 1);
+
             for (String reserved : BukkitPlugin.reservedWords) {
                 if (reserved.equalsIgnoreCase(str)) {
                     throw new ConfigException("key", "The specified scanner name is a reserved config keyword.");
                 }
             }
-            
-            for(Scanner scanner : nested) {
-              if(scanner.name.equalsIgnoreCase(str)) {
-                  ConfigurationSection conf = config.getConfigurationSection(str);
-                  return scanner.config(conf, sub, newValue);
-              }
+
+            for (Scanner scanner : nested) {
+                if (scanner.name.equalsIgnoreCase(str)) {
+                    ConfigurationSection conf = config.getConfigurationSection(str);
+                    return scanner.config(conf, sub, newValue);
+                }
             }
-            
+
             throw new ConfigException("key", "The nested scanner was not found.");
         } else {
-            if(key.equalsIgnoreCase("enable")){
-                if(newValue != null) {
+            if (key.equalsIgnoreCase("enable")) {
+                if (newValue != null) {
                     enable = BukkitPlugin.parseBooleanStrict(newValue);
                     config.set("enable", enable);
                 }
                 return Boolean.toString(enable);
-            }
-            else if(key.equalsIgnoreCase("action")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("action")) {
+                if (newValue != null) {
                     action = Actions.valueOf(newValue.toUpperCase());
                     config.set("action", action.toString());
                 }
                 return action.toString();
-            }
-            else if(key.equalsIgnoreCase("fallback")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("fallback")) {
+                if (newValue != null) {
                     fallback = Actions.valueOf(newValue.toUpperCase());
                     config.set("fallback", fallback.toString());
                 }
                 return fallback.toString();
-            }
-            else if(key.equalsIgnoreCase("priority")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("priority")) {
+                if (newValue != null) {
                     priority = Integer.parseInt(newValue);
                     config.set("priority", priority);
                 }
                 return Integer.toString(priority);
-            }
-            else if(key.equalsIgnoreCase("range")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("range")) {
+                if (newValue != null) {
                     range = Integer.parseInt(newValue);
                     config.set("range", range);
                 }
                 return Integer.toString(range);
-            }
-            else if(key.equalsIgnoreCase("below")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("below")) {
+                if (newValue != null) {
                     below = Integer.parseInt(newValue);
                     config.set("below", below);
                 }
                 return Integer.toString(below);
-            }
-            else if(key.equalsIgnoreCase("above")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("above")) {
+                if (newValue != null) {
                     above = Integer.parseInt(newValue);
                     config.set("above", above);
                 }
                 return Integer.toString(above);
-            }
-            else if(key.equalsIgnoreCase("count")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("count")) {
+                if (newValue != null) {
                     count = Integer.parseInt(newValue);
                     config.set("count", count);
                 }
                 return Integer.toString(count);
-            }
-            else if(key.equalsIgnoreCase("hard_limit")){
-                if(newValue != null) {
+            } else if (key.equalsIgnoreCase("hard_limit")) {
+                if (newValue != null) {
                     hardLimit = Integer.parseInt(newValue);
                     config.set("hard_limit", hardLimit);
                 }
@@ -237,9 +251,9 @@ public class Scanner {
             } else {
                 throw new ConfigException("key", "The specified key does not correspond with any known setting key.");
             }
-        }      
+        }
     }
-    
+
     public Actions runScanner(World world, int wx, int wy, int wz) {
         int counter = 0;
         int hardCounter = 0;
@@ -263,29 +277,29 @@ public class Scanner {
                         return action;
                     }
 
-                    if (nested.size() > 0) {
-                        loop:
-                        for (Scanner nest : nested) {
-                            switch (nest.runScanner(world, x, y, z)) {
-                                case PREVENT:
-                                    return Actions.PREVENT;
-                                case ALLOW:
-                                    return Actions.ALLOW;
-                                case CONTINUE:
-                                    continue scanning;
-                                case COUNT:
-                                    if (++counter >= count) {
-                                        return action;
-                                    }
-                                    break;
-                                case SKIP:
-                                    break loop;
-                            }
+                    loop:
+                    for (Scanner nest : nested) {
+                        switch (nest.runScanner(world, x, y, z)) {
+                            case PREVENT:
+                                return Actions.PREVENT;
+                            case ALLOW:
+                                return Actions.ALLOW;
+                            case CONTINUE:
+                                continue loop;
+                            case COUNT:
+                                if (++counter >= count) {
+                                    return action;
+                                }
+                                continue scanning;
+                            case SKIP:
+                                continue scanning;
                         }
-                    } else {
-                        if (++counter >= count) {
-                            return action;
-                        }
+                    }
+
+                    // if there's no nested scanners enabled,
+                    // or all nested scanners said "continue", count.
+                    if (++counter >= count) {
+                        return action;
                     }
                 }
             }
@@ -293,37 +307,48 @@ public class Scanner {
 
         return fallback;
     }
-    
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-        
+
         sb.append("Scanner ");
         sb.append(name);
         sb.append(" { ");
-        sb.append(enable?"enabled, ":"disabled, ");
-        sb.append("priority "); sb.append(priority); sb.append(", ");
-        sb.append("range ["); sb.append(range); sb.append(", ");
-        sb.append(-below); sb.append(", "); sb.append(above); sb.append("], ");
-        sb.append("limit "); sb.append(count);
-        sb.append(" hard "); sb.append(hardLimit); sb.append(", ");
-        
+        sb.append(enable ? "enabled, " : "disabled, ");
+        sb.append("priority ");
+        sb.append(priority);
+        sb.append(", ");
+        sb.append("range [");
+        sb.append(range);
+        sb.append(", ");
+        sb.append(-below);
+        sb.append(", ");
+        sb.append(above);
+        sb.append("], ");
+        sb.append("limit ");
+        sb.append(count);
+        sb.append(" hard ");
+        sb.append(hardLimit);
+        sb.append(", ");
+
         // blocks
         List<Material> mats = getBlocks();
-        if(mats.isEmpty()) {
+        if (mats.isEmpty()) {
             sb.append("NO BLOCKS, ");
         } else {
             sb.append(" blocks [");
             sb.append(mats.get(0).toString());
-            for(int i=1;i<mats.size();i++) {
+            for (int i = 1; i < mats.size(); i++) {
                 sb.append(", ");
                 sb.append(mats.get(i).toString());
             }
             sb.append("], ");
         }
-        sb.append(nested.size()); sb.append(" nested scanners");
+        sb.append(nested.size());
+        sb.append(" nested scanners");
         sb.append("};");
-        
+
         return sb.toString();
     }
 }

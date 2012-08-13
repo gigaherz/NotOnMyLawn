@@ -12,7 +12,7 @@ scanners:
         below: 5              # Number of blocks below the spawn position (default 2)
         above: 5              # Number of blocks above the spawn position (default 2)
         count: 10             # Number of blocks matched after which the action is performed (default 1)
-        hard_limit: 50        # Hard limit of detected blocks after which the action is performed
+        hard_limit: 50        # Hard limit of detected blocks after which the action is performed (default 10% of total = 60)
         blocks:               # List of blocks that will be used to trigger the action (at least 1 required)
         - WOOD
         - COBBLESTONE
